@@ -1,0 +1,414 @@
+<!doctype html>
+<html>
+<head>
+  <link rel="manifest" href="/suncalc/manifest.json">
+  <script type="text/javascript" src="/suncalc/dist/suncalc.js"></script>
+  <script type="text/javascript" src="/suncalc/dist/Chart.bundle.min.js"></script>
+  <script type="text/javascript" src="/suncalc/dist/app.js"></script>
+</head>
+<body>
+  <style>
+	table.daystats {
+		font-family: "Segoe UI";
+		font-size: 14pt;
+	}
+  </style>
+  <h2>SunCalc</h2>
+
+  <table>
+    <tr>
+	  <td>
+        <canvas id="dayChart" width="400" height="400"></canvas>
+	  </td>
+	  <td>
+	    <table class="daystats">
+		  <tr>
+		    <th style="width:160px"></th>
+		    <th style="width:160px">Daylight Hours</th>
+		    <th style="width:160px">Nighttime Hours</th>
+		  </tr>
+		  <tr>
+		    <td>Summer Solstice</td>
+		    <td><span id="spnDayHoursSS"></span></td>
+		    <td><span id="spnNightHoursSS"></span></td>
+		  </tr>
+		  <tr style="font-weight:bold">
+		    <td>Today</td>
+		    <td><span id="spnDayHoursT"></span></td>
+		    <td><span id="spnNightHoursT"></span></td>
+		  </tr>
+		  <tr>
+		    <td>Winter Solstice</td>
+		    <td><span id="spnDayHoursWS"></span></td>
+		    <td><span id="spnNightHoursWS"></span></td>
+		  </tr>
+		</table>
+	  </td>
+	</tr>
+  </table>
+
+  <p>Calculates sunrise/sunset and moon illumination.</p>
+  
+  <p>
+    Set Current Location : <br/><br/>
+    
+    <table>
+      <tr>
+        <td>Latitude :</td>
+        <td>Longitude : </td>
+        <td></td>
+        <td></td>
+      </tr>
+      <tr>
+        <td><input type="number" id="txtLat"></input></td>
+        <td><input type="number" id="txtLong"></input></td>
+        <td><button onclick="getLocation()">Get Location</button></td>
+        <td><button onclick="refreshStatistics()">Refresh Statistics</button></td>
+      </tr>
+    </table>
+    <span id="spnLocationError"></span>
+  <p>
+  
+  <div id="output"></div>
+  
+  <script>
+    var ctx = document.getElementById("dayChart").getContext("2d");
+    
+    var currDate = new Date(),
+      domElement = document.getElementById("output"),
+      lat = 37.106909,
+      lng = -76.464493;
+  
+    function refreshStatistics() {
+      lat = document.getElementById("txtLat").value;
+      lng = document.getElementById("txtLong").value;
+      
+      generateStatistics(currDate);
+    }
+    
+    function getLocation() {
+      if (navigator.geolocation)
+      {
+          navigator.geolocation.getCurrentPosition(getLocationSuccess);
+      }
+      else
+      {
+          document.getElementById("spnLocationError").innerHTML="Geolocation is not supported by this browser.";
+      }
+    }
+    
+    function getLocationSuccess(position) {
+      document.getElementById("txtLat").value = position.coords.latitude;
+      document.getElementById("txtLong").value = position.coords.longitude;
+      
+      lat = position.coords.latitude;
+      lng = position.coords.longitude;
+      
+      generateStatistics(currDate);
+    }
+    
+    function addDate(unixDate, offset, offsetType) {
+      var oldDate = new Date();
+      oldDate.setTime(unixDate);
+      var year = parseInt(oldDate.getFullYear());
+      var month = parseInt(oldDate.getMonth());
+      var date = parseInt(oldDate.getDate());
+      var hour = parseInt(oldDate.getHours());
+      var mins = parseInt(oldDate.getMinutes());
+      var newDate;
+
+      switch (offsetType) {
+        case "years":
+        case "Y":
+        case "y":
+          newDate = new Date(year + offset, month, date, hour, mins);
+          break;
+        case "months":
+        case "M":
+        case "m":
+          newDate = new Date(year, month + offset, date, hour, mins);
+          break;
+        case "days":
+        case "D":
+        case "d":
+          newDate = new Date(year, month, date + offset, hour, mins);
+          break;
+        case "weeks":
+        case "W":
+        case "w":
+          newDate = new Date(year, month, date + offset*7, hour, mins);
+          break;
+        case "hours":
+        case "H":
+        case "h":
+          newDate = new Date(year, month, date, hour + offset, mins);
+          break;
+      }
+
+      return newDate.getTime();            
+    } 
+    
+    dateDiff = function(datepart, fromdate, todate) {
+      datepart = datepart.toLowerCase();
+      var diff = todate - fromdate;
+      var divideBy = { w:604800000, 
+                       d:86400000, 
+                       h:3600000, 
+                       n:60000, 
+                       s:1000 };
+      
+      return Math.floor( diff/divideBy[datepart]);
+    };
+
+    function getTime(date) {
+      var h = date.getHours(),
+        m = date.getMinutes(),
+        s = date.getSeconds(),
+        ap = (h>12)?"PM":"AM";
+      
+      if (h>12) { h = h - 12 };
+      if (h<10) { h = '0' + h };
+      if (m<10) { m = '0' + m };
+      if (s<10) { s = '0' + s };
+      
+      return (h + ":" + m + ":" + s + " " + ap);
+    }
+    
+    function trace(string) 
+    {
+      domElement.innerHTML = domElement.innerHTML + string + "<br/>";
+    }
+    
+    function clearTrace()
+    {
+      domElement.innerHTML = "";
+    }
+  
+    function generateStatistics(date) {
+      clearTrace("");
+      var sunPos = SunCalc.getPosition(date, lat, lng);
+      var times = SunCalc.getTimes(date, lat, lng);
+      //var moonPos = SunCalc.getMoonPosition(date, lat, lng);
+      var moonIllum = SunCalc.getMoonIllumination(date);
+      //var moonTimes = SunCalc.getMoonTimes(new Date('2013-03-04UTC'), lat, lng, true);
+
+      trace("Sun Times");
+      trace("Sunrise : " + getTime(times.sunrise));    
+      trace("Sunset : " + getTime(times.sunset));
+      trace("SolarNoon : " + getTime(times.solarNoon));
+      trace("Nadir : " + getTime(times.nadir));
+      trace("dawn : " + getTime(times.dawn));
+      trace("dusk : " + getTime(times.dusk));
+      trace("nauticalDawn : " + getTime(times.nauticalDawn));
+      trace("nauticalDusk : " + getTime(times.nauticalDusk));
+      trace("goldenHour : " + getTime(times.goldenHour));
+      trace("goldenHourEnd : " + getTime(times.goldenHourEnd));
+      trace("day length : " + dateDiff( "n", times.dawn, times.dusk)) + " minutes";
+      
+      trace("");
+      trace("Moon Illumination");
+      trace("fraction : " + moonIllum.fraction);
+      trace("phase : " + moonIllum.phase);
+      trace("angle : " + moonIllum.angle);
+      if (moonIllum.phase < .08) {
+		trace("new moon");
+	  }
+	  else if (moonIllum.phase < .21) {
+	    trace ("waxing crecent");
+	  }
+	  else if (moonIllum.phase < .35) {
+	    trace ("first quarter");
+	  }
+	  else if (moonIllum.phase < .44) {
+	    trace ("waxing gibbous");
+	  }
+	  else if (moonIllum.phase < .56) {
+	    trace ("full");
+	  }
+	  else if (moonIllum.phase < .69) {
+	    trace ("waning gibbous");
+	  }
+	  else if (moonIllum.phase < .82) {
+	    trace ("waning crecent");
+	  }
+	  else if (moonIllum.phase < .94) {
+	    trace ("new");
+	  }
+      getSolstices();
+    }
+    
+    // converts the 'times' of day periods to lengths :
+    // "nadir approach" : nadir -> nautical dawn
+    // "nauticaldawn" : nautical dawn -> dawn
+    // "dawn" : dawn -> goldenHourEnd
+    // "day" : goldenHourEnd -> goldenHour
+    // "dusk" : goldenHour -> dusk
+    // "nadir recede" : dusk -> nadir
+    function getPeriodLengths(sunTimes) {
+      // we will use tonight's nadir as estimate for last nights nadir
+      var nadir1 = sunTimes.nadir;
+      var nadir2 = sunTimes.nadir;
+      if (sunTimes.nadir < sunTimes.dawn) {
+        nadir2 = addDate(sunTimes.nadir.getTime(), 1, "d");
+      }
+      else {
+        nadir1 = addDate(sunTimes.nadir.getTime(), -1, "d");
+      }
+      
+      return {
+        nadirMorning : dateDiff("n", new Date(nadir1), sunTimes.nauticalDawn),
+        nauticalDawn: dateDiff("n", sunTimes.nauticalDawn, sunTimes.dawn),
+        dawn: dateDiff("n", sunTimes.dawn, sunTimes.goldenHourEnd),
+        day: dateDiff("n", sunTimes.goldenHourEnd, sunTimes.goldenHour),
+        dusk: dateDiff("n", sunTimes.goldenHour, sunTimes.dusk),
+        nauticalDusk: dateDiff("n", sunTimes.dusk, sunTimes.nauticalDusk),
+        nadirEvening: dateDiff("n", sunTimes.nauticalDusk, new Date(nadir2))
+      };
+    }
+    
+    function getSolstices() {
+      var dailyStats = [];
+      var now = new Date().getTime();
+      var start = addDate(now, -6, "m");
+      var end = addDate(now, 6, "m");
+
+      var times, dayLength, dayStats;
+      var wsTimes, ssTimes, tTimes = SunCalc.getTimes(new Date(now), lat, lng);
+      
+      var minLength = 9999, minDate = now, idxLength;
+      var maxLength = 0, maxDate = now;
+      
+      for (var d = start; d <= end; d = addDate(d, 1, "d")) {
+          times = SunCalc.getTimes(d, lat, lng);
+          
+          // calculate number of minutes in iterative day
+          idxLength = dateDiff( "n", times.dawn, times.dusk);
+          
+          if (idxLength < minLength) {
+            minLength = idxLength;
+            minDate = new Date(d);
+          }
+          
+          if (idxLength > maxLength) {
+            maxLength = idxLength;
+            maxDate = new Date(d);
+          }
+      }
+      
+      wsTimes = SunCalc.getTimes(minDate, lat, lng);
+      ssTimes = SunCalc.getTimes(maxDate, lat, lng);
+      
+      var wsPeriods = getPeriodLengths(wsTimes);
+      var ssPeriods = getPeriodLengths(ssTimes);
+      var tPeriods = getPeriodLengths(tTimes);
+      
+      trace("");
+      trace("Solstice information");
+      trace("winster solstice seems to be " + minLength  + " minutes on : " + minDate);
+      trace("summer solstice seems to be : " + maxLength + " minutes on : " + maxDate);
+      
+      document.getElementById("spnDayHoursSS").innerHTML = ((ssPeriods.day + ssPeriods.dawn + ssPeriods.dusk) / 60).toFixed(2);
+      document.getElementById("spnNightHoursSS").innerHTML = ((ssPeriods.nadirEvening + ssPeriods.nadirMorning + ssPeriods.nauticalDusk + ssPeriods.nauticalDawn) / 60).toFixed(2);
+      document.getElementById("spnDayHoursT").innerHTML = ((tPeriods.day + tPeriods.dawn + tPeriods.dusk) / 60).toFixed(2);
+      document.getElementById("spnNightHoursT").innerHTML = ((tPeriods.nadirEvening + tPeriods.nadirMorning + tPeriods.nauticalDusk + tPeriods.nauticalDawn) / 60).toFixed(2);
+      document.getElementById("spnDayHoursWS").innerHTML = ((wsPeriods.day + wsPeriods.dawn + wsPeriods.dusk) / 60).toFixed(2);
+      document.getElementById("spnNightHoursWS").innerHTML = ((wsPeriods.nadirEvening + wsPeriods.nadirMorning + wsPeriods.nauticalDusk + wsPeriods.nauticalDawn) / 60).toFixed(2);
+
+      var config = {
+          type: 'doughnut',
+          data: {
+              datasets: [{
+                  data: [
+                      ssPeriods.nadirMorning/60,
+                      ssPeriods.nauticalDawn/60,
+                      ssPeriods.dawn/60,
+                      ssPeriods.day/60,
+                      ssPeriods.dusk/60,
+                      ssPeriods.nauticalDusk/60,
+                      ssPeriods.nadirEvening/60
+                  ],
+                  backgroundColor: [
+                      "#222244",
+                      "#8888aa",
+                      "#FDB45C",
+                      "#FFFF66",
+                      "#FDB45C",
+                      "#aa8888",
+                      "#222244"
+                  ],
+                  label: 'Summer Solstice'
+              }, {
+                  hidden: false,
+                  data: [
+                      tPeriods.nadirMorning/60,
+                      tPeriods.nauticalDawn/60,
+                      tPeriods.dawn/60,
+                      tPeriods.day/60,
+                      tPeriods.dusk/60,
+                      tPeriods.nauticalDusk/60,
+                      tPeriods.nadirEvening/60
+                  ],
+                  backgroundColor: [
+                      "#222244",
+                      "#8888aa",
+                      "#FDB45C",
+                      "#FFFF66",
+                      "#FDB45C",
+                      "#aa8888",
+                      "#222244"
+                  ],
+                  label: 'Todays'
+              }, {
+                  data: [
+                      wsPeriods.nadirMorning/60,
+                      wsPeriods.nauticalDawn/60,
+                      wsPeriods.dawn/60,
+                      wsPeriods.day/60,
+                      wsPeriods.dusk/60,
+                      wsPeriods.nauticalDusk/60,
+                      wsPeriods.nadirEvening/60
+                  ],
+                  backgroundColor: [
+                      "#222244",
+                      "#8888aa",
+                      "#FDB45C",
+                      "#FFFF66",
+                      "#FDB45C",
+                      "#aa8888",
+                      "#222244"
+                  ],
+                  label: 'Winter Solstice'
+              }],
+              labels: [
+                  "Nadir Morning",
+                  "Nautical Dawn",
+                  "Dawn",
+                  "Day",
+                  "Dusk",
+                  "Nautical Dusk",
+                  "Evening Nadir"
+              ]
+          },
+          options: {
+              rotation: Math.PI * -1.5,
+              responsive: false,
+              legend: {
+                  position: 'top'
+              },
+              title: {
+                  display: true,
+                  text: 'Daily division relative to Soltices'
+              }
+          }
+      };
+
+      window.myDoughnut = new Chart(ctx, config);      
+    }
+    
+    function getEquinocts() {
+    }
+    
+    generateStatistics(currDate);
+  </script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <script type="text/javascript" src="suncalc.js"></script>
+</head>
+<body>
+  <h2>SunCalc</h2>
+  
+  <p>Calculates sunrise/sunset and moon illumination.</p>
+  
+  <div id="output"></div>
+  
+  <script>
+    var date = new Date(),
+      domElement = document.getElementById("output"),
+      lat = 37.106909,
+      lng = -76.464493;
+  
+    function getTime(date) {
+      var h = date.getHours(),
+        m = date.getMinutes(),
+        s = date.getSeconds(),
+        ap = (h>12)?"PM":"AM";
+      
+      if (h>12) { h = h - 12 };
+      if (h<10) { h = '0' + h };
+      if (m<10) { m = '0' + m };
+      if (s<10) { s = '0' + s };
+      
+      return (h + ":" + m + ":" + s + " " + ap);
+    }
+    
+    function trace(string) 
+    {
+      domElement.innerHTML = domElement.innerHTML + string + "<br/>";
+    }
+  
+    var sunPos = SunCalc.getPosition(date, lat, lng);
+    var times = SunCalc.getTimes(date, lat, lng);
+    var moonPos = SunCalc.getMoonPosition(date, lat, lng);
+    var moonIllum = SunCalc.getMoonIllumination(date);
+    var moonTimes = SunCalc.getMoonTimes(new Date('2013-03-04UTC'), lat, lng, true);
+
+    trace("Sun Times");
+    trace("Sunrise : " + getTime(times.sunrise));    
+    trace("Sunset : " + getTime(times.sunset));
+    trace("SolarNoon : " + getTime(times.solarNoon));
+    trace("Nadir : " + getTime(times.nadir));
+    trace("dawn : " + getTime(times.dawn));
+    trace("dusk : " + getTime(times.dusk));
+    trace("nauticalDawn : " + getTime(times.nauticalDawn));
+    trace("nauticalDusk : " + getTime(times.nauticalDusk));
+    trace("goldenHour : " + getTime(times.goldenHour));
+    trace("goldenHourEnd : " + getTime(times.goldenHourEnd));
+    
+    trace("");
+    trace("Moon Illumination");
+    trace("fraction : " + moonIllum.fraction);
+    trace("phase : " + moonIllum.phase);
+    trace("angle : " + moonIllum.angle);
+  </script>
+</body>
+</html>
